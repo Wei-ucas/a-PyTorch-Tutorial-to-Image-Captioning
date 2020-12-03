@@ -13,7 +13,7 @@ If you're new to PyTorch, first read [Deep Learning with PyTorch: A 60 Minute Bl
 Questions, suggestions, or corrections can be posted as issues.
 
 I'm using `PyTorch 0.4` in `Python 3.6`.
-
+`PyTorch 1.3` also works well 
 ---
 
 **27 Jan 2020**: Working code for two new tutorials has been added — [Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution) and [Machine Translation](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Machine-Translation)
@@ -317,7 +317,7 @@ The parameters for the model (and training it) are at the beginning of the file,
 
 To **train your model from scratch**, simply run this file –
 
-`python train.py`
+`python train.py config/baseline.py`
 
 To **resume training at a checkpoint**, point to the corresponding file with the `checkpoint` parameter at the beginning of the code.
 
@@ -396,7 +396,7 @@ During inference, we _cannot_ directly use the `forward()` method in the Decoder
 
 To **caption an image** from the command line, point to the image, model checkpoint, word map (and optionally, the beam size) as follows –
 
-`python caption.py --img='path/to/image.jpeg' --model='path/to/BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar' --word_map='path/to/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json' --beam_size=5`
+`python caption.py --img='path/to/image.jpeg' --config='config/baseline.py' --model='path/to/BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar' --word_map='path/to/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json' --beam_size=5`
 
 Alternatively, use the functions in the file as needed.
 
