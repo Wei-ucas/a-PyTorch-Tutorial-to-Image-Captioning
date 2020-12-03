@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torchvision
+from methods import positionalencoding2d
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -10,7 +11,7 @@ class Encoder(nn.Module):
     Encoder.
     """
 
-    def __init__(self, encoded_image_size=14):
+    def __init__(self, encoded_image_size=14, pos_embed=False):
         super(Encoder, self).__init__()
         self.enc_image_size = encoded_image_size
 
@@ -22,7 +23,11 @@ class Encoder(nn.Module):
 
         # Resize image to fixed size to allow input images of variable size
         self.adaptive_pool = nn.AdaptiveAvgPool2d((encoded_image_size, encoded_image_size))
-
+        self.pos_embed = pos_embed
+        if self.pos_embed:
+            self.pos_embed_attr = positionalencoding2d(2048, encoded_image_size,
+                                                       encoded_image_size).cuda()  # d_model*height*width
+        self.norm = nn.LayerNorm(2048)
         self.fine_tune()
 
     def forward(self, images):
@@ -34,7 +39,11 @@ class Encoder(nn.Module):
         """
         out = self.resnet(images)  # (batch_size, 2048, image_size/32, image_size/32)
         out = self.adaptive_pool(out)  # (batch_size, 2048, encoded_image_size, encoded_image_size)
+        if self.pos_embed:
+            out = out + self.pos_embed_attr[None, :, :, :]
         out = out.permute(0, 2, 3, 1)  # (batch_size, encoded_image_size, encoded_image_size, 2048)
+
+        out = self.norm(out)
         return out
 
     def fine_tune(self, fine_tune=True):
@@ -91,7 +100,7 @@ class DecoderWithAttention(nn.Module):
     Decoder.
     """
 
-    def __init__(self, attention_dim, embed_dim, decoder_dim, vocab_size, encoder_dim=2048, dropout=0.5):
+    def __init__(self, attention_dim=512, embed_dim=512, decoder_dim=512, vocab_size=0, encoder_dim=2048, dropout=0.5):
         """
         :param attention_dim: size of attention network
         :param embed_dim: embedding size

@@ -2,34 +2,59 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
+from models import Encoder, DecoderWithAttention
 from datasets import *
 from utils import *
 from nltk.translate.bleu_score import corpus_bleu
 import torch.nn.functional as F
 from tqdm import tqdm
+import sys
+from mmcv import Config
 
+
+if len(sys.argv) < 3:
+    print('usage python eval.py [config file] [checkpoint] [beam size]')
+    exit(0)
+
+config = Config.fromfile(sys.argv[1])
+checkpoint = sys.argv[2]
+if len(sys.argv) < 4:
+    beam_size = 1
+else:
+    beam_size = int(sys.argv[3])
 # Parameters
-data_folder = '/media/ssd/caption data'  # folder with data files saved by create_input_files.py
-data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
-checkpoint = '../BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'  # model checkpoint
-word_map_file = '/media/ssd/caption data/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json'  # word map, ensure it's the same the data was encoded with and the model was trained with
+data_folder = config.data_folder  # folder with data files saved by create_input_files.py
+data_name = config.test_data_name  # base name shared by data files
+# checkpoint = '/data2/ww/image_caption/cpks/b80_pretrain_pos_embed_finetune/BEST_checkpoint_epoch_24_coco_5_cap_per_img_5_min_word_freq.pth.tar'  # model checkpoint
+word_map_file = '/data4/fb/datasets/caption_data/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json'  # word map, ensure it's the same the data was encoded with and the model was trained with
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
-# Load model
-checkpoint = torch.load(checkpoint)
-decoder = checkpoint['decoder']
-decoder = decoder.to(device)
-decoder.eval()
-encoder = checkpoint['encoder']
-encoder = encoder.to(device)
-encoder.eval()
 
 # Load word map (word2ix)
 with open(word_map_file, 'r') as j:
     word_map = json.load(j)
 rev_word_map = {v: k for k, v in word_map.items()}
 vocab_size = len(word_map)
+
+# Load model
+encoder = Encoder(**config.encoder)
+decoder = DecoderWithAttention(vocab_size=vocab_size,**config.decoder)
+
+
+checkpoint = torch.load(checkpoint)
+if isinstance(checkpoint['decoder'], torch.nn.Module):
+    decoder.load_state_dict(checkpoint['decoder'].state_dict())
+    encoder.load_state_dict(checkpoint['encoder'].state_dict())
+else:
+    decoder.load_state_dict(checkpoint['decoder'])
+    encoder.load_state_dict(checkpoint['encoder'])
+decoder = decoder.to(device)
+decoder.eval()
+encoder = encoder.to(device)
+encoder.eval()
+
+
 
 # Normalization transform
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -68,12 +93,14 @@ def evaluate(beam_size):
 
         # Encode
         encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
-        enc_image_size = encoder_out.size(1)
-        encoder_dim = encoder_out.size(3)
+        enc_image_size = encoder_out.shape[1]
+        # print(encoder_out)
+        encoder_dim = encoder_out.shape[3]
+
 
         # Flatten encoding
         encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
-        num_pixels = encoder_out.size(1)
+        num_pixels = encoder_out.shape[1]
 
         # We'll treat the problem as having a batch size of k
         encoder_out = encoder_out.expand(k, num_pixels, encoder_dim)  # (k, num_pixels, encoder_dim)
@@ -175,5 +202,5 @@ def evaluate(beam_size):
 
 
 if __name__ == '__main__':
-    beam_size = 1
+    # beam_size = 1
     print("\nBLEU-4 score @ beam size of %d is %.4f." % (beam_size, evaluate(beam_size)))
