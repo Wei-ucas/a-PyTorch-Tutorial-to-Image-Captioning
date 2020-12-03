@@ -11,7 +11,6 @@ from tqdm import tqdm
 import sys
 from mmcv import Config
 
-
 if len(sys.argv) < 3:
     print('usage python eval.py [config file] [checkpoint] [beam size]')
     exit(0)
@@ -25,11 +24,9 @@ else:
 # Parameters
 data_folder = config.data_folder  # folder with data files saved by create_input_files.py
 data_name = config.test_data_name  # base name shared by data files
-# checkpoint = '/data2/ww/image_caption/cpks/b80_pretrain_pos_embed_finetune/BEST_checkpoint_epoch_24_coco_5_cap_per_img_5_min_word_freq.pth.tar'  # model checkpoint
 word_map_file = '/data4/fb/datasets/caption_data/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json'  # word map, ensure it's the same the data was encoded with and the model was trained with
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
-
 
 # Load word map (word2ix)
 with open(word_map_file, 'r') as j:
@@ -39,8 +36,7 @@ vocab_size = len(word_map)
 
 # Load model
 encoder = Encoder(**config.encoder)
-decoder = DecoderWithAttention(vocab_size=vocab_size,**config.decoder)
-
+decoder = DecoderWithAttention(vocab_size=vocab_size, **config.decoder)
 
 checkpoint = torch.load(checkpoint)
 if isinstance(checkpoint['decoder'], torch.nn.Module):
@@ -54,14 +50,12 @@ decoder.eval()
 encoder = encoder.to(device)
 encoder.eval()
 
-
-
 # Normalization transform
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
 
 
-def evaluate(beam_size):
+def evaluate():
     """
     Evaluation
 
@@ -96,7 +90,6 @@ def evaluate(beam_size):
         enc_image_size = encoder_out.shape[1]
         # print(encoder_out)
         encoder_dim = encoder_out.shape[3]
-
 
         # Flatten encoding
         encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
@@ -203,4 +196,4 @@ def evaluate(beam_size):
 
 if __name__ == '__main__':
     # beam_size = 1
-    print("\nBLEU-4 score @ beam size of %d is %.4f." % (beam_size, evaluate(beam_size)))
+    print("\nBLEU-4 score @ beam size of %d is %.4f." % (beam_size, evaluate()))

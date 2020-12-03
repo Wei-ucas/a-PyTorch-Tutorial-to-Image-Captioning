@@ -9,7 +9,7 @@ import skimage.transform
 import argparse
 from scipy.misc import imread, imresize
 from PIL import Image
-
+from mmcv import Config
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -189,19 +189,27 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Show, Attend, and Tell - Tutorial - Generate Caption')
 
     parser.add_argument('--img', '-i', help='path to image')
+    parser.add_argument('--config', '-i', help='model config')
     parser.add_argument('--model', '-m', help='path to model')
     parser.add_argument('--word_map', '-wm', help='path to word map JSON')
     parser.add_argument('--beam_size', '-b', default=5, type=int, help='beam size for beam search')
     parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
 
     args = parser.parse_args()
-
+    config = Config.fromfile(args.config)
     # Load model
-    checkpoint = torch.load(args.model, map_location=str(device))
-    decoder = checkpoint['decoder']
+    encoder = Encoder(**config.encoder)
+    decoder = DecoderWithAttention(vocab_size=vocab_size, **config.decoder)
+
+    checkpoint = torch.load(args.model)
+    if isinstance(checkpoint['decoder'], torch.nn.Module):
+        decoder.load_state_dict(checkpoint['decoder'].state_dict())
+        encoder.load_state_dict(checkpoint['encoder'].state_dict())
+    else:
+        decoder.load_state_dict(checkpoint['decoder'])
+        encoder.load_state_dict(checkpoint['encoder'])
     decoder = decoder.to(device)
     decoder.eval()
-    encoder = checkpoint['encoder']
     encoder = encoder.to(device)
     encoder.eval()
 
